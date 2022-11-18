@@ -12,5 +12,6 @@ ddl project poster: Dec 8th around five weeks
 network list:
 1. DQN
 2. Deep-Deterministic Policy Gradient Algorithm [ddpg](https://spinningup.openai.com/en/latest/algorithms/ddpg.html#:~:text=Deep%20Deterministic%20Policy%20Gradient%20(DDPG,function%20to%20learn%20the%20policy)
-3. [Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environments](https://arxiv.org/abs/1706.02275)
-4. [Cooperative Multi-agent Control Using Deep Reinforcement Learning](https://link.springer.com/chapter/10.1007/978-3-319-71682-4_5)
+
+3. [Cooperative Multi-agent Control Using Deep Reinforcement Learning](https://link.springer.com/chapter/10.1007/978-3-319-71682-4_5)
+4. [Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environments](https://arxiv.org/abs/1706.02275)
