@@ -3,31 +3,52 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 
-class PreyNet(nn.Module):
-    def __init__(self, n_inputs, n_outputs, learning_rate):
-        super(PreyNet, self).__init__()
-        self.out = nn.Linear(n_inputs, n_outputs)
-        # training
-        self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
-
+class ActorNet(nn.Module):
+    
+    def __init__(self, d_in,d_out):
+        super(ActorNet,self).__init__()     
+        self.action_vector = nn.Sequential(nn.Linear(d_in,32),
+                                 nn.ReLU(),
+                                 nn.Linear(32,d_out),
+                                 nn.Tanh())
+              
     def forward(self, x):
-        # x = x.to(device)
-        return self.out(x)
-
-    def loss(self, q_outputs, q_targets):
-        raise NotImplementedError
+        return self.action_vector(x)
 
 
-class PredatorNet(nn.Module):
-    def __init__(self, n_inputs, n_outputs, learning_rate):
-        super(PredatorNet, self).__init__()
-        self.out = nn.Linear(n_inputs, n_outputs)
-        # training
-        self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
 
+class CriticNet(nn.Module):
+    
+    def __init__(self, d_in,d_out):
+        super(CriticNet,self).__init__()     
+        self.value = nn.Sequential(nn.Linear(d_in+d_out,32),
+                                 nn.ReLU(),
+                                 nn.Linear(32,1))
+        
     def forward(self, x):
-        # x = x.to(device)
-        return self.out(x)
+     
+        return self.value(x)
 
-    def loss(self, q_outputs, q_targets):
-        raise NotImplementedError
+
+class Actor():
+
+    def __init__(self, n_o, n_a):
+        self.dim_a = n_a
+        self.dim_o = n_o
+        self.policy = ActorNet(n_o, n_a)
+
+    def get_action(self, state):
+        return self.policy(state)
+
+
+class Critic():
+    
+    def __init__(self, n_o, n_a):
+        self.dim_o = n_o
+        self.value_func = CriticNet(n_o, n_a)
+        
+    
+    def get_state_value(self, state, action):
+        x = torch.cat((state,action), dim = 1)
+        state_value = self.value_func.forward(x)
+        return state_value
