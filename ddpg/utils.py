@@ -10,7 +10,7 @@ def extract_data(sample):
     states_tuple = np.array([_[0] for _ in sample])
     actions_tuple = np.array([_[1] for _ in sample])
     next_states_tuple = np.array([_[2] for _ in sample])
-    rewards_tuple = np.array([_[3] for _ in sample])
+    rewards_tuple = np.float32(np.array([_[3] for _ in sample]))
 
     compressed_states = torch.from_numpy(states_tuple).requires_grad_()
     compressed_actions = torch.from_numpy(actions_tuple).requires_grad_()

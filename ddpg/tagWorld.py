@@ -35,6 +35,8 @@ class TagWorld:
         n_inputs_adv = 16
         n_outputs = 5
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         # initiate the networks for the agents
         # the reason why critic network use 1 as output and the unsqueeze later
         self.GoodNetActor = Actor(n_inputs_good, n_outputs)
@@ -60,29 +62,30 @@ class TagWorld:
 
         self.env.reset()
 
-    def random_sample(self):
-        self.env.reset()
-        for agent in self.env.agent_iter():
-            observation, reward, termination, truncation, info = self.env.last()
-            action = None if termination or truncation else self.env.action_space(
-                agent).sample()  # this is where you would insert your policy
-
-            self.env.step(action)
-
-        self.env.close()
+    # def random_sample(self):
+    #     self.env.reset()
+    #     for agent in self.env.agent_iter():
+    #         observation, reward, termination, truncation, info = self.env.last()
+    #         action = None if termination or truncation else self.env.action_space(
+    #             agent).sample()  # this is where you would insert your policy
+    #
+    #         self.env.step(action)
+    #
+    #     self.env.close()
 
     def train(self):
         self.env.reset()
-        max_episodes = 4500
+        max_episodes = 200
+        max_rollout = 500
 
         for _ in tqdm(range(max_episodes)):
             self.env.reset()
+            count = 0
 
             for agent in self.env.agent_iter():
                 # action from network
-                print(agent)
                 observation, _, _, _, _ = self.env.last()
-                # todo: add noise and clip
+                # todo: add noise
                 if agent == 'agent_0':
                     action = self.GoodNetActor.get_action(torch.from_numpy(observation))
                     # tensor([0.1313, -0.0689, -0.0344, 0.1128, -0.3169], grad_fn= < TanhBackward0 >)
@@ -113,21 +116,23 @@ class TagWorld:
                 else:
                     self.ReplayBufferAdv.append_memory(experience)
 
-                if termination_new is True:
-                    self.env.reset()
+                if termination_new or truncation_new or count > 500:
+                    break
 
                 if self.ReplayBufferAdv.buf_len() >= self.BUFFER_SIZE:
-                    # todo: should we train adversary and agent at the same time
+                    # todo: should we train adversary and agent at the same time, cause if it is agent turn,
+                    # then the adversary network should not be updated? maybe add a if condition
                     # Time to update learnings
                     sampled_experience_good = self.ReplayBufferGood.sample()
                     sampled_experience_adv = self.ReplayBufferAdv.sample()
 
+                    # calculate target network
                     # Good Agent
                     compressed_states_good, compressed_actions_good, compressed_next_states_good, \
                         compressed_rewards_good = extract_data(sampled_experience_good)
 
-                    # all actions returned here are negative
                     target_action_good = self.GoodNetActorTarget.get_action(compressed_next_states_good)
+                    # todo: should we average the action tensor? Maybe we should use all those info, same below
                     target_action_good = target_action_good.mean(dim=1).unsqueeze(-1)  # (32, 5) -> (32, 1)
                     target_value_good = self.GoodNetCriticTarget.get_state_value(compressed_next_states_good,
                                                                                  target_action_good)
@@ -145,6 +150,9 @@ class TagWorld:
                     target_v_good = compressed_rewards_good.unsqueeze(1) + self.GAMMA * target_value_good
                     target_v_adv = compressed_rewards_adv.unsqueeze(1) + self.GAMMA * target_value_adv
 
+                    # calculate Q function
+                    compressed_actions_good = compressed_actions_good.mean(dim=1).unsqueeze(-1)
+                    compressed_actions_adv = compressed_actions_adv.mean(dim=1).unsqueeze(-1)
                     actual_v_good = self.GoodNetCritic.get_state_value(compressed_states_good, compressed_actions_good)
                     actual_v_adv = self.AdvNetCritic.get_state_value(compressed_states_adv, compressed_actions_adv)
 
@@ -208,24 +216,21 @@ class TagWorld:
                         param_t_adv.data = param_o_adv.data * self.TAU + param_t_adv.data * (1 - self.TAU)
 
                     self.GoodNetActor.policy.zero_grad()
-                    self.GoodNetActorTarget.zero_grad()
+                    self.GoodNetActorTarget.policy.zero_grad()
                     self.GoodNetCritic.value_func.zero_grad()
                     self.GoodNetCriticTarget.value_func.zero_grad()
 
-                    torch.save(self.GoodNetActorTarget.policy.state_dict(),
-                               self.agent_name + 'good_target_actor_state_1.pt')
-                    torch.save(self.GoodNetCriticTarget.value_func.state_dict(),
-                               self.agent_name + 'good_target_critic_state_1.pt')
+                    # torch.save(self.GoodNetActorTarget.policy.state_dict(), 'good_target_actor_state_1.pt')
+                    # torch.save(self.GoodNetCriticTarget.value_func.state_dict(), 'good_target_critic_state_1.pt')
 
                     self.AdvNetActor.policy.zero_grad()
-                    self.AdvNetActorTarget.zero_grad()
+                    self.AdvNetActorTarget.policy.zero_grad()
                     self.AdvNetCritic.value_func.zero_grad()
                     self.AdvNetCriticTarget.value_func.zero_grad()
+                    # torch.save(self.AdvNetActorTarget.policy.state_dict(), 'adv_target_actor_state_1.pt')
+                    # torch.save(self.AdvNetCriticTarget.value_func.state_dict(), 'adv_target_critic_state_1.pt')
 
-                    torch.save(self.AdvNetActorTarget.policy.state_dict(),
-                               self.agent_name + 'adv_target_actor_state_1.pt')
-                    torch.save(self.AdvNetCriticTarget.value_func.state_dict(),
-                               self.agent_name + 'adv_target_critic_state_1.pt')
+                count = count + 1
 
 
 if __name__ == "__main__":
