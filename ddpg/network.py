@@ -1,11 +1,8 @@
 import torch.nn as nn
-# import torch.optim as optim
-# import torch.nn.functional as F
 import torch
 
 
 class ActorNet(nn.Module):
-
     def __init__(self, d_in, d_out):
         super(ActorNet, self).__init__()
         self.action_vector = nn.Sequential(nn.Linear(d_in, 32),
@@ -18,7 +15,6 @@ class ActorNet(nn.Module):
 
 
 class CriticNet(nn.Module):
-
     def __init__(self, d_in, d_out):
         super(CriticNet, self).__init__()
         self.value = nn.Sequential(nn.Linear(d_in + d_out, 32),
@@ -30,10 +26,7 @@ class CriticNet(nn.Module):
 
 
 class Actor:
-
     def __init__(self, n_o, n_a):
-        self.dim_a = n_a
-        self.dim_o = n_o
         self.policy = ActorNet(n_o, n_a)
 
     def get_action(self, state):
@@ -41,12 +34,9 @@ class Actor:
 
 
 class Critic:
-
     def __init__(self, n_o, n_a):
-        self.dim_o = n_o
         self.value_func = CriticNet(n_o, n_a)
 
     def get_state_value(self, state, action):
         x = torch.cat((state, action), dim=1)
-        state_value = self.value_func.forward(x)
-        return state_value
+        return self.value_func.forward(x)

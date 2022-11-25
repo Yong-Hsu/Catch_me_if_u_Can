@@ -1,11 +1,13 @@
 from pettingzoo.mpe import simple_tag_v2
-from collections import deque
-import random
-from network import *
+
 import copy
+import random
+from utils import ReplayBuffer, extract_data
 from tqdm import tqdm
-import utils
-import torch
+
+# import torch
+import numpy as np
+from network import *
 
 
 class TagWorld:
@@ -16,7 +18,7 @@ class TagWorld:
             num_adversaries=3,
             num_obstacles=2,
             max_cycles=1000,
-            continuous_actions=False
+            continuous_actions=True
         )
 
         # parameters
@@ -34,12 +36,12 @@ class TagWorld:
         n_outputs = 5
 
         # initiate the networks for the agents
-        # critic network
+        # the reason why critic network use 1 as output and the unsqueeze later
         self.GoodNetActor = Actor(n_inputs_good, n_outputs)
-        self.GoodNetCritic = Critic(n_inputs_good, n_outputs)
+        self.GoodNetCritic = Critic(n_inputs_good, 1)
 
         self.AdvNetActor = Actor(n_inputs_adv, n_outputs)
-        self.AdvNetCritic = Critic(n_inputs_adv, n_outputs)
+        self.AdvNetCritic = Critic(n_inputs_adv, 1)
 
         # Target Network
         self.GoodNetActorTarget = copy.deepcopy(self.GoodNetActor)
@@ -70,20 +72,26 @@ class TagWorld:
         self.env.close()
 
     def train(self):
-        # raise NotImplementedError
-
         self.env.reset()
         max_episodes = 4500
+
         for _ in tqdm(range(max_episodes)):
             self.env.reset()
+
             for agent in self.env.agent_iter():
-                # action from network already there
-                observation, reward, termination, truncation, info = self.env.last()
-                # todo: add maybe noise and clip
+                # action from network
+                print(agent)
+                observation, _, _, _, _ = self.env.last()
+                # todo: add noise and clip
                 if agent == 'agent_0':
-                    action = self.GoodNetActor.get_action(observation)
+                    action = self.GoodNetActor.get_action(torch.from_numpy(observation))
+                    # tensor([0.1313, -0.0689, -0.0344, 0.1128, -0.3169], grad_fn= < TanhBackward0 >)
+                    action = action.detach().numpy()
+                    action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
                 else:
-                    action = self.AdvNetActor.get_action(observation)
+                    action = self.AdvNetActor.get_action(torch.from_numpy(observation))
+                    action = action.detach().numpy()
+                    action = np.clip(action, 0, 1)
 
                 # epsilon greedy, if true, replace the action above
                 p = random.random()
@@ -92,38 +100,41 @@ class TagWorld:
                 # Decay greedy epsilon
                 self.epsilon = self.epsilon * self.decay
 
-                # Get the new state, reward, and done signal  todo: truncation
-                observation_new, reward_new, termination_new, truncation_new, _ = self.env.step(action)
-                experience = [observation, action, reward_new, termination_new]
+                # Get the new state, reward, and done signal
+                self.env.step(action)
+                _, reward_new, termination_new, truncation_new, _ = self.env.last()
+                observation_new = self.env.observe(agent)
 
                 # store replay buffer
+                experience = [observation, action, observation_new, reward_new]
                 if agent == 'agent_0':
+                    # different iteration or do the calculation
                     self.ReplayBufferGood.append_memory(experience)
                 else:
                     self.ReplayBufferAdv.append_memory(experience)
-                print(1)
-                # todo: 11
+
                 if termination_new is True:
                     self.env.reset()
 
-                #
                 if self.ReplayBufferAdv.buf_len() >= self.BUFFER_SIZE:
+                    # todo: should we train adversary and agent at the same time
                     # Time to update learnings
                     sampled_experience_good = self.ReplayBufferGood.sample()
                     sampled_experience_adv = self.ReplayBufferAdv.sample()
 
                     # Good Agent
-                    compressed_states_good, compressed_actions_good, compressed_next_states_good, compressed_rewards_good \
-                        = utils.extract_data(sampled_experience_good)
+                    compressed_states_good, compressed_actions_good, compressed_next_states_good, \
+                        compressed_rewards_good = extract_data(sampled_experience_good)
 
+                    # all actions returned here are negative
                     target_action_good = self.GoodNetActorTarget.get_action(compressed_next_states_good)
-                    target_action_good = target_action_good.mean(dim=1).unsqueeze(-1)
+                    target_action_good = target_action_good.mean(dim=1).unsqueeze(-1)  # (32, 5) -> (32, 1)
                     target_value_good = self.GoodNetCriticTarget.get_state_value(compressed_next_states_good,
                                                                                  target_action_good)
 
                     # Adversarial Agent
                     compressed_states_adv, compressed_actions_adv, compressed_next_states_adv, compressed_rewards_adv \
-                        = utils.extract_data(sampled_experience_adv)
+                        = extract_data(sampled_experience_adv)
 
                     target_action_adv = self.AdvNetActorTarget.get_action(compressed_next_states_adv)
                     target_action_adv = target_action_adv.mean(dim=1).unsqueeze(-1)
@@ -159,7 +170,7 @@ class TagWorld:
                         action_good.mean().backward(retain_graph=True)
 
                         for param in self.GoodNetActor.policy.parameters():
-                            param.data += self.ALPHA * (param.grad * grad_wrt_a_good[1].item()) / (self.BATCH_SIZE)
+                            param.data += self.ALPHA * (param.grad * grad_wrt_a_good[1].item()) / self.BATCH_SIZE
 
                         self.GoodNetActor.policy.zero_grad()
                         self.GoodNetCritic.value_func.zero_grad()
@@ -172,7 +183,7 @@ class TagWorld:
                         action_adv.mean().backward(retain_graph=True)
 
                         for param in self.AdvNetActor.policy.parameters():
-                            param.data += self.ALPHA * (param.grad * grad_wrt_a_adv[1].item()) / (self.BATCH_SIZE)
+                            param.data += self.ALPHA * (param.grad * grad_wrt_a_adv[1].item()) / self.BATCH_SIZE
 
                         self.AdvNetActor.policy.zero_grad()
                         self.AdvNetCritic.value_func.zero_grad()
@@ -187,7 +198,7 @@ class TagWorld:
                                                           self.GoodNetCriticTarget.value_func.parameters()):
                         param_t_good.data = param_o_good.data * self.TAU + param_t_good.data * (1 - self.TAU)
 
-                    # Adversial agent
+                    # Adversarial agent
                     for param_o_adv, param_t_adv in zip(self.AdvNetActor.policy.parameters(),
                                                         self.AdvNetActorTarget.policy.parameters()):
                         param_t_adv.data = param_o_adv.data * self.TAU + param_t_adv.data * (1 - self.TAU)
@@ -220,19 +231,3 @@ class TagWorld:
 if __name__ == "__main__":
     test = TagWorld()
     test.train()
-
-
-class ReplayBuffer:
-    def __init__(self, max_length):
-        self.max_length = max_length
-        self.Buffer = deque(
-            maxlen=self.max_length)  # The last firt entry gets automatically removed when the buffer size is exceeded
-
-    def append_memory(self, experience):
-        self.Buffer.appendleft(experience)
-
-    def sample(self, batch_size=32):
-        return random.sample(self.Buffer, batch_size)
-
-    def buf_len(self):
-        return len(self.Buffer)
