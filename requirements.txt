@@ -1,0 +1,5 @@
+# torch==1.12.1+cu116
+# use the module load on HPC
+PettingZoo==1.22.1
+numpy==1.23.2
+tqdm==4.64.1
