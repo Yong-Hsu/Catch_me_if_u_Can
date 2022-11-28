@@ -36,6 +36,7 @@ class TagWorld:
         n_outputs = 5
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print("device:", self.device)
 
         # initiate the networks for the agents
         # the reason why critic network use 1 as output and the unsqueeze later
@@ -52,30 +53,29 @@ class TagWorld:
         self.AdvNetActorTarget = copy.deepcopy(self.AdvNetActor)
         self.AdvNetCriticTarget = copy.deepcopy(self.AdvNetCritic)
 
+        # to GPU
+        self.GoodNetActor.policy.to(self.device)
+        self.GoodNetCritic.value_func.to(self.device)
+        self.AdvNetActor.policy.to(self.device)
+        self.AdvNetCritic.value_func.to(self.device)
+        self.GoodNetActorTarget.policy.to(self.device)
+        self.GoodNetCriticTarget.value_func.to(self.device)
+        self.AdvNetActorTarget.policy.to(self.device)
+        self.AdvNetCriticTarget.value_func.to(self.device)
+
         # Experience
         self.ReplayBufferGood = ReplayBuffer(self.BUFFER_SIZE)
         self.ReplayBufferAdv = ReplayBuffer(self.BUFFER_SIZE)
 
         # optimizer todo:
-        self.optim_good= torch.optim.Adam(self.GoodNetCritic.value_func.parameters(), lr=self.ALPHA) 
+        self.optim_good = torch.optim.Adam(self.GoodNetCritic.value_func.parameters(), lr=self.ALPHA)
         self.optim_adv = torch.optim.Adam(self.AdvNetCritic.value_func.parameters(), lr=self.ALPHA)
 
         self.env.reset()
 
-    # def random_sample(self):
-    #     self.env.reset()
-    #     for agent in self.env.agent_iter():
-    #         observation, reward, termination, truncation, info = self.env.last()
-    #         action = None if termination or truncation else self.env.action_space(
-    #             agent).sample()  # this is where you would insert your policy
-    #
-    #         self.env.step(action)
-    #
-    #     self.env.close()
-
     def train(self):
         self.env.reset()
-        max_episodes = 200
+        max_episodes = 5
         max_rollout = 500
 
         for _ in tqdm(range(max_episodes)):
@@ -83,17 +83,20 @@ class TagWorld:
             count = 0
 
             for agent in self.env.agent_iter():
+                if count % 50 == 0:
+                    print(count)
+
                 # action from network
                 observation, _, _, _, _ = self.env.last()
                 # todo: add noise
                 if agent == 'agent_0':
-                    action = self.GoodNetActor.get_action(torch.from_numpy(observation))
+                    action = self.GoodNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     # tensor([0.1313, -0.0689, -0.0344, 0.1128, -0.3169], grad_fn= < TanhBackward0 >)
-                    action = action.detach().numpy()
+                    action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
                 else:
-                    action = self.AdvNetActor.get_action(torch.from_numpy(observation))
-                    action = action.detach().numpy()
+                    action = self.AdvNetActor.get_action(torch.from_numpy(observation).to(self.device))
+                    action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)
 
                 # epsilon greedy, if true, replace the action above
@@ -116,27 +119,17 @@ class TagWorld:
                 else:
                     self.ReplayBufferAdv.append_memory(experience)
 
-                if termination_new or truncation_new or count > 500:
+                if termination_new or truncation_new or count > max_rollout:
                     break
 
+                # run all agents in every loop
                 if self.ReplayBufferAdv.buf_len() >= self.BUFFER_SIZE:
                     # sampled_experience_good = self.ReplayBufferGood.sample()
                     sampled_experience_adv = self.ReplayBufferAdv.sample()
 
-                    # calculate target network
-                    # Good Agent
-                    # compressed_states_good, compressed_actions_good, compressed_next_states_good, \
-                    #    compressed_rewards_good = extract_data(sampled_experience_good)
-
-                    # target_action_good = self.GoodNetActorTarget.get_action(compressed_next_states_good)
-                    # todo: should we average the action tensor? Maybe we should use all those info, same below
-                    # target_action_good = target_action_good.mean(dim=1).unsqueeze(-1)  # (32, 5) -> (32, 1)
-                    # target_value_good = self.GoodNetCriticTarget.get_state_value(compressed_next_states_good,
-                    #                                                              target_action_good)
-
                     # Adversarial Agent
                     compressed_states_adv, compressed_actions_adv, compressed_next_states_adv, compressed_rewards_adv \
-                        = extract_data(sampled_experience_adv)
+                        = extract_data(sampled_experience_adv, self.device)
 
                     target_action_adv = self.AdvNetActorTarget.get_action(compressed_next_states_adv)
                     target_action_adv = target_action_adv.mean(dim=1).unsqueeze(-1)
@@ -148,9 +141,7 @@ class TagWorld:
                     target_v_adv = compressed_rewards_adv.unsqueeze(1) + self.GAMMA * target_value_adv
 
                     # calculate Q function
-                    # compressed_actions_good = compressed_actions_good.mean(dim=1).unsqueeze(-1)
                     compressed_actions_adv = compressed_actions_adv.mean(dim=1).unsqueeze(-1)
-                    # actual_v_good = self.GoodNetCritic.get_state_value(compressed_states_good, compressed_actions_good)
                     actual_v_adv = self.AdvNetCritic.get_state_value(compressed_states_adv, compressed_actions_adv)
 
                     # train the network
@@ -168,20 +159,6 @@ class TagWorld:
                     # self.GoodNetCritic.value_func.zero_grad()
                     self.AdvNetCritic.value_func.zero_grad()
 
-                    # One step gradient ascent for updating policy
-                    # for s, a in zip(compressed_states_good.split(1), compressed_actions_good.split(1)):
-                        # online_v_good = self.GoodNetCritic.get_state_value(s, a)
-                        # grad_wrt_a_good = torch.autograd.grad(online_v_good, (s, a))
-
-                        # action_good = self.GoodNetActor.get_action(s)
-                        # action_good.mean().backward(retain_graph=True)
-
-                        # for param in self.GoodNetActor.policy.parameters():
-                            # param.data += self.ALPHA * (param.grad * grad_wrt_a_good[1].item()) / self.BATCH_SIZE
-
-                        # self.GoodNetActor.policy.zero_grad()
-                        # self.GoodNetCritic.value_func.zero_grad()
-
                     for s, a in zip(compressed_states_adv.split(1), compressed_actions_adv.split(1)):
                         online_v_adv = self.AdvNetCritic.get_state_value(s, a)
                         grad_wrt_a_adv = torch.autograd.grad(online_v_adv, (s, a))
@@ -195,16 +172,6 @@ class TagWorld:
                         self.AdvNetActor.policy.zero_grad()
                         self.AdvNetCritic.value_func.zero_grad()
 
-                    # Update the target networks
-                    # Good agent
-                    # for param_o_good, param_t_good in zip(self.GoodNetActor.policy.parameters(),
-                    #                                       self.GoodNetActorTarget.policy.parameters()):
-                    #     param_t_good.data = param_o_good.data * self.TAU + param_t_good.data * (1 - self.TAU)
-
-                    # for param_o_good, param_t_good in zip(self.GoodNetCritic.value_func.parameters(),
-                    #                                       self.GoodNetCriticTarget.value_func.parameters()):
-                    #     param_t_good.data = param_o_good.data * self.TAU + param_t_good.data * (1 - self.TAU)
-
                     # Adversarial agent
                     for param_o_adv, param_t_adv in zip(self.AdvNetActor.policy.parameters(),
                                                         self.AdvNetActorTarget.policy.parameters()):
@@ -214,11 +181,6 @@ class TagWorld:
                                                         self.AdvNetCriticTarget.value_func.parameters()):
                         param_t_adv.data = param_o_adv.data * self.TAU + param_t_adv.data * (1 - self.TAU)
 
-                    # self.GoodNetActor.policy.zero_grad()
-                    # self.GoodNetActorTarget.policy.zero_grad()
-                    # self.GoodNetCritic.value_func.zero_grad()
-                    # self.GoodNetCriticTarget.value_func.zero_grad()
-
                     # torch.save(self.GoodNetActorTarget.policy.state_dict(), 'good_target_actor_state_1.pt')
                     # torch.save(self.GoodNetCriticTarget.value_func.state_dict(), 'good_target_critic_state_1.pt')
 
@@ -226,8 +188,7 @@ class TagWorld:
                     self.AdvNetActorTarget.policy.zero_grad()
                     self.AdvNetCritic.value_func.zero_grad()
                     self.AdvNetCriticTarget.value_func.zero_grad()
-                    # torch.save(self.AdvNetActorTarget.policy.state_dict(), 'adv_target_actor_state_1.pt')
-                    # torch.save(self.AdvNetCriticTarget.value_func.state_dict(), 'adv_target_critic_state_1.pt')
+
                 
                 if self.ReplayBufferGood.buf_len() >= self.BUFFER_SIZE:
                     # 
@@ -235,12 +196,14 @@ class TagWorld:
 
                     # calculate target network
                     # Good Agent
-                    compressed_states_good, compressed_actions_good, compressed_next_states_good, compressed_rewards_good = extract_data(sampled_experience_good)
+                    compressed_states_good, compressed_actions_good, compressed_next_states_good, \
+                        compressed_rewards_good = extract_data(sampled_experience_good, self.device)
 
                     target_action_good = self.GoodNetActorTarget.get_action(compressed_next_states_good)
                     # todo: should we average the action tensor? Maybe we should use all those info, same below
                     target_action_good = target_action_good.mean(dim=1).unsqueeze(-1)  # (32, 5) -> (32, 1)
-                    target_value_good = self.GoodNetCriticTarget.get_state_value(compressed_next_states_good,target_action_good)
+                    target_value_good = self.GoodNetCriticTarget.get_state_value(compressed_next_states_good,
+                                                                                 target_action_good)
 
                     # Compute targets
                     target_v_good = compressed_rewards_good.unsqueeze(1) + self.GAMMA * target_value_good
@@ -285,7 +248,19 @@ class TagWorld:
                     self.GoodNetCritic.value_func.zero_grad()
                     self.GoodNetCriticTarget.value_func.zero_grad()
 
+                    # torch.save(self.AdvNetActorTarget.policy.state_dict(), 'adv_target_actor_state_1.pt')
+                    # torch.save(self.AdvNetCriticTarget.value_func.state_dict(), 'adv_target_critic_state_1.pt')
+
                 count = count + 1
+
+    def plot_res(self):
+        # network error
+        # reward every fixed steps
+        raise NotImplementedError
+
+    def render(self):
+        # use the pt file
+        raise NotImplementedError
 
 
 if __name__ == "__main__":

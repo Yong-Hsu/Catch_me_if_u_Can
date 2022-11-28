@@ -6,7 +6,7 @@ from collections import deque
 import numpy as np
 
 
-def extract_data(sample):
+def extract_data(sample, device):
     states_tuple = np.array([_[0] for _ in sample])
     actions_tuple = np.array([_[1] for _ in sample])
     next_states_tuple = np.array([_[2] for _ in sample])
@@ -17,8 +17,8 @@ def extract_data(sample):
     compressed_next_states = torch.from_numpy(next_states_tuple)
     compressed_rewards = torch.from_numpy(rewards_tuple)
 
-    return F.normalize(compressed_states), F.normalize(compressed_actions), F.normalize(compressed_next_states), \
-        compressed_rewards
+    return F.normalize(compressed_states).to(device), F.normalize(compressed_actions).to(device), \
+        F.normalize(compressed_next_states).to(device), compressed_rewards.to(device)
 
 
 class OuNoise:
