@@ -4,6 +4,7 @@ import copy
 import random
 from utils import ReplayBuffer, extract_data
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # import torch
 import numpy as np
@@ -12,13 +13,19 @@ from network import *
 
 class TagWorld:
     def __init__(self):
+        self.n_good = 1
+        self.n_adv = 3
+        self.n_obstacles = 2
+        self.max_cycs = 1000
+        self.continuous = True
+        
         self.env = simple_tag_v2.env(
             # todo: works with one good agent now
-            num_good=1,
-            num_adversaries=3,
-            num_obstacles=2,
-            max_cycles=1000,
-            continuous_actions=True
+            num_good=self.n_good,
+            num_adversaries=self.n_adv,
+            num_obstacles=self.n_obstacles,
+            max_cycles=self.max_cycs,
+            continuous_actions=self.continuous
         )
 
         # parameters
@@ -78,23 +85,43 @@ class TagWorld:
         max_episodes = 5
         max_rollout = 500
 
+        # Store rewards to be plotted
+        rewards_good = []
+        rewards_adv = []
+
+        # Epsilon stored for plotting
+        epsilon_plotting = []
+
+        # Loss for plotting
+        loss_plotting_good = []
+        loss_plotting_adv = []
+
+
         for _ in tqdm(range(max_episodes)):
             self.env.reset()
             count = 0
+
+            reward_good = 0
+            reward_adv = 0
+
+            output_good = 0
+            output_adv = 0
 
             for agent in self.env.agent_iter():
                 if count % 50 == 0:
                     print(count)
 
                 # action from network
-                observation, _, _, _, _ = self.env.last()
+                observation, agent_reward, _, _, _ = self.env.last()
                 # todo: add noise
                 if agent == 'agent_0':
+                    reward_good = reward_good + agent_reward
                     action = self.GoodNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     # tensor([0.1313, -0.0689, -0.0344, 0.1128, -0.3169], grad_fn= < TanhBackward0 >)
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
                 else:
+                    reward_adv = reward_adv + agent_reward
                     action = self.AdvNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)
@@ -252,11 +279,54 @@ class TagWorld:
                     # torch.save(self.AdvNetCriticTarget.value_func.state_dict(), 'adv_target_critic_state_1.pt')
 
                 count = count + 1
+            
+            rewards_good.append(reward_good/self.n_good) # appends the average reward of all good agents
+            rewards_adv.append(reward_adv/self.n_adv) # appends the average reward of all the adversial agents
 
-    def plot_res(self):
+            epsilon_plotting.append(self.epsilon) # appends the epsilon value after each episode
+
+            loss_plotting_good.append(output_good)
+            loss_plotting_adv.append(output_adv)
+
+        self.plot_res(self, rewards_good, rewards_adv, epsilon_plotting, loss_plotting_good,loss_plotting_adv)
+
+
+
+
+
+    def plot_res(self, rewards_good, rewards_adv, epsilon_plotting, loss_plotting_good,loss_plotting_adv):
         # network error
         # reward every fixed steps
-        raise NotImplementedError
+        # raise NotImplementedError
+
+        # Plotting the avg rewards
+        fig1, axes1 = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
+        plt.figure(figsize=(16, 9))
+        axes1[0, 0].set(title='Good agents average rewards',xlabel='Number of episodes', ylabel='Average Reward')
+        axes1[1, 0].set(title='Adversial agents average rewards',xlabel='Number of episodes', ylabel='Average Reward')
+        axes1[0,0].plot(rewards_good)
+        axes1[0,1].plot(rewards_adv)
+        plt.show()
+
+        # Plotting the epsilon decay
+        plt.plot(epsilon_plotting)
+        plt.title('Epsilon Decay')
+        plt.xlabel('Number of episodes')
+        plt.ylabel('Epsilon value')
+        plt.show()
+
+        # Plotting the loss at the end of each episode
+        fig2, axes2 = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
+        plt.figure(figsize=(16, 9))
+        axes2[0, 0].set(title='Good agents loss',xlabel='Number of episodes', ylabel='Loss')
+        axes1[1, 0].set(title='Adversial agents loss',xlabel='Number of episodes', ylabel='Loss')
+        axes2[0,0].plot(loss_plotting_good)
+        axes2[0,1].plot(loss_plotting_adv)
+        plt.show()
+
+
+        
+
 
     def render(self):
         # use the pt file
