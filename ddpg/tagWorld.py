@@ -293,29 +293,50 @@ class TagWorld:
     @staticmethod
     def plot_res(rewards_good, rewards_adv, epsilon_plotting, loss_plotting_good, loss_plotting_adv):
         # Plotting the avg rewards
-        fig1, axes1 = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
-        plt.figure(figsize=(16, 9))
-        axes1[0].set(title='Good agents average rewards', xlabel='Number of episodes', ylabel='Average Reward')
-        axes1[1].set(title='Adversial agents average rewards', xlabel='Number of episodes', ylabel='Average Reward')
-        axes1[0].plot(rewards_good)
-        axes1[1].plot(rewards_adv)
-        plt.show()
-
-        # Plotting the epsilon decay
+        plt.figure(1)
+        plt.plot(rewards_good)
+        plt.title('Good agents average rewards')
+        plt.xlabel('Number of episodes')
+        plt.ylabel('Average Reward')
+        
+        plt.figure(2)
+        plt.plot(rewards_adv)
+        plt.title('Adversial agents average rewards')
+        plt.xlabel('Number of episodes')
+        plt.ylabel('Average Reward')
+        
+        plt.figure(3)
         plt.plot(epsilon_plotting)
         plt.title('Epsilon Decay')
         plt.xlabel('Number of episodes')
         plt.ylabel('Epsilon value')
+        
         plt.show()
+        # fig1, axes1 = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
+        # plt.figure(figsize=(16, 9))
+        # fig1.subplots_adjust(hspace=.5)
+        # axes1[0].set(title='Good agents average rewards', xlabel='Number of episodes', ylabel='Average Reward')
+        # axes1[1].set(title='Adversial agents average rewards', xlabel='Number of episodes', ylabel='Average Reward')
+        # axes1[0].plot(rewards_good)
+        # axes1[1].plot(rewards_adv)
 
-        # Plotting the loss at the end of each episode
-        fig2, axes2 = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
-        plt.figure(figsize=(16, 9))
-        axes2[0].set(title='Good agents loss', xlabel='Number of episodes', ylabel='Loss')
-        axes1[1].set(title='Adversarial agents loss', xlabel='Number of episodes', ylabel='Loss')
-        axes2[0].plot(loss_plotting_good.cpu().detach().numpy())
-        axes2[1].plot(loss_plotting_adv.cpu().detach().numpy())
-        plt.show()
+        # # Plotting the epsilon decay
+        # plt.figure()
+        # plt.plot(epsilon_plotting)
+        # plt.title('Epsilon Decay')
+        # plt.xlabel('Number of episodes')
+        # plt.ylabel('Epsilon value')
+
+        # # Plotting the loss at the end of each episode
+        # plt.figure()
+        # fig2, axes2 = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
+        # plt.figure(figsize=(16, 9))
+        # fig2.tight_layout()
+        # axes2[0].set(title='Good agents loss', xlabel='Number of episodes', ylabel='Loss')
+        # axes1[1].set(title='Adversarial agents loss', xlabel='Number of episodes', ylabel='Loss')
+        # axes2[0].plot(loss_plotting_good)
+        # axes2[1].plot(loss_plotting_adv.numpy)
+        # plt.show()
 
     def render(self):
         env = simple_tag_v2.env(
@@ -337,14 +358,13 @@ class TagWorld:
                 action = self.AdvNetActor.policy(torch.from_numpy(env.last()[0]).to(self.device))
                 action = action.cpu().detach().numpy()
                 action = np.clip(action, 0, 1)
-                print(action)
+                # print(action)
             else:
                 action = None if termination or truncation else env.action_space(agent).sample()
 
             env.step(action)
+            env.render()
             time.sleep(0.01)
-
-        env.render()
         env.close()
         # raise NotImplementedError
 
