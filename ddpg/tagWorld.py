@@ -38,7 +38,7 @@ class TagWorld:
         self.BUFFER_SIZE = 5000
         self.epsilon = 0.9
         self.decay = 0.99
-        self.max_episodes = 35
+        self.max_episodes = 1
         self.max_rollout = 350
 
         n_inputs_good = 14
@@ -113,18 +113,24 @@ class TagWorld:
 
                 # action from network
                 observation, agent_reward, _, _, _ = self.env.last()
-                # todo: add noise
                 if agent == 'agent_0':
                     reward_good = reward_good + agent_reward
                     action = self.GoodNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     # tensor([0.1313, -0.0689, -0.0344, 0.1128, -0.3169], grad_fn= < TanhBackward0 >)
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
+
+                    agent_reward += np.linalg.norm((observation[8], observation[9])) + \
+                        np.linalg.norm((observation[10] + observation[11])) + \
+                        np.linalg.norm((observation[12] + observation[13]))
                 else:
                     reward_adv = reward_adv + agent_reward
                     action = self.AdvNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)
+
+                    agent_reward -= np.linalg.norm((observation[8], observation[9])) + \
+                        np.linalg.norm((observation[10] + observation[11]))
 
                 # epsilon greedy, if true, replace the action above
                 p = random.random()
@@ -271,8 +277,8 @@ class TagWorld:
                 #     self.GoodNetCritic.value_func.zero_grad()
                 #     self.GoodNetCriticTarget.value_func.zero_grad()
                 #
-                    # torch.save(self.GoodNetActorTarget.policy.state_dict(), 'good_target_actor_state_1.pt')
-                    # torch.save(self.GoodNetCriticTarget.value_func.state_dict(), 'good_target_critic_state_1.pt')
+                # torch.save(self.GoodNetActorTarget.policy.state_dict(), 'good_target_actor_state_1.pt')
+                # torch.save(self.GoodNetCriticTarget.value_func.state_dict(), 'good_target_critic_state_1.pt')
 
                 count = count + 1
 
@@ -298,7 +304,7 @@ class TagWorld:
         plt.xlabel('Number of episodes')
         plt.ylabel('Average Reward')
         plt.savefig(f'fig_{time.time()}_1.png')
-        
+
         plt.figure(2)
         plt.plot(rewards_adv)
         plt.title('Adversial agents average rewards')
