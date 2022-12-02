@@ -34,26 +34,27 @@ class TagWorld:
         self.GAMMA = 0.99  # Discount factor
         self.ALPHA = 1e-3  # learning rate
         self.TAU = 0.001
-        self.BATCH_SIZE = 16
-        self.BUFFER_SIZE = 1000
-        self.env.reset()
+        self.BATCH_SIZE = 32
+        self.BUFFER_SIZE = 5000
         self.epsilon = 0.9
         self.decay = 0.99
+        self.max_episodes = 35
+        self.max_rollout = 350
 
         n_inputs_good = 14
         n_inputs_adv = 16
         n_outputs = 5
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print("device:", self.device)
+        print("Running on device:", self.device)
 
         # initiate the networks for the agents
         # the reason why critic network use 1 as output and the unsqueeze later
-        self.GoodNetActor = Actor(n_inputs_good, n_outputs)
-        self.GoodNetCritic = Critic(n_inputs_good, 1)
+        self.GoodNetActor = Actor(n_inputs_good, n_outputs, self.BATCH_SIZE)
+        self.GoodNetCritic = Critic(n_inputs_good, 1, self.BATCH_SIZE)
 
-        self.AdvNetActor = Actor(n_inputs_adv, n_outputs)
-        self.AdvNetCritic = Critic(n_inputs_adv, 1)
+        self.AdvNetActor = Actor(n_inputs_adv, n_outputs, self.BATCH_SIZE)
+        self.AdvNetCritic = Critic(n_inputs_adv, 1, self.BATCH_SIZE)
 
         # Target Network
         self.GoodNetActorTarget = copy.deepcopy(self.GoodNetActor)
@@ -84,8 +85,6 @@ class TagWorld:
 
     def train(self):
         self.env.reset()
-        max_episodes = 6
-        max_rollout = 400
 
         # Store rewards to be plotted
         rewards_good = []
@@ -98,7 +97,7 @@ class TagWorld:
         loss_plotting_good = []
         loss_plotting_adv = []
 
-        for _ in tqdm(range(max_episodes)):
+        for _ in tqdm(range(self.max_episodes)):
             self.env.reset()
             count = 0
 
@@ -109,8 +108,8 @@ class TagWorld:
             output_adv = 0
 
             for agent in self.env.agent_iter():
-                if count % 50 == 0:
-                    print(count)
+                # if count % 50 == 0:
+                #     print(count)
 
                 # action from network
                 observation, agent_reward, _, _, _ = self.env.last()
@@ -147,13 +146,13 @@ class TagWorld:
                 else:
                     self.ReplayBufferAdv.append_memory(experience)
 
-                if termination_new or truncation_new or count > max_rollout:
+                if termination_new or truncation_new or count > self.max_rollout:
                     break
 
                 # run all agents in every loop
                 if self.ReplayBufferAdv.buf_len() >= self.BUFFER_SIZE:
                     # sampled_experience_good = self.ReplayBufferGood.sample()
-                    sampled_experience_adv = self.ReplayBufferAdv.sample()
+                    sampled_experience_adv = self.ReplayBufferAdv.sample(batch_size=64)
 
                     # Adversarial Agent
                     compressed_states_adv, compressed_actions_adv, compressed_next_states_adv, compressed_rewards_adv \
@@ -208,9 +207,6 @@ class TagWorld:
                     for param_o_adv, param_t_adv in zip(self.AdvNetCritic.value_func.parameters(),
                                                         self.AdvNetCriticTarget.value_func.parameters()):
                         param_t_adv.data = param_o_adv.data * self.TAU + param_t_adv.data * (1 - self.TAU)
-
-                    # torch.save(self.GoodNetActorTarget.policy.state_dict(), 'good_target_actor_state_1.pt')
-                    # torch.save(self.GoodNetCriticTarget.value_func.state_dict(), 'good_target_critic_state_1.pt')
 
                     self.AdvNetActor.policy.zero_grad()
                     self.AdvNetActorTarget.policy.zero_grad()
@@ -275,19 +271,22 @@ class TagWorld:
                 #     self.GoodNetCritic.value_func.zero_grad()
                 #     self.GoodNetCriticTarget.value_func.zero_grad()
                 #
-                #     # torch.save(self.AdvNetActorTarget.policy.state_dict(), 'adv_target_actor_state_1.pt')
-                #     # torch.save(self.AdvNetCriticTarget.value_func.state_dict(), 'adv_target_critic_state_1.pt')
+                    # torch.save(self.GoodNetActorTarget.policy.state_dict(), 'good_target_actor_state_1.pt')
+                    # torch.save(self.GoodNetCriticTarget.value_func.state_dict(), 'good_target_critic_state_1.pt')
 
                 count = count + 1
 
             rewards_good.append(reward_good / self.n_good)  # appends the average reward of all good agents
-            rewards_adv.append(reward_adv / self.n_adv)  # appends the average reward of all the adversial agents
+            rewards_adv.append(reward_adv / self.n_adv)  # appends the average reward of all the adversarial agents
 
             epsilon_plotting.append(self.epsilon)  # appends the epsilon value after each episode
 
             loss_plotting_good.append(output_good)
             loss_plotting_adv.append(output_adv)
 
+        torch.save(self.AdvNetActor.policy.state_dict(), f'AdvNetActor_{time.time()}.pt')
+        torch.save(self.AdvNetActorTarget.policy.state_dict(), f'adv_target_actor_state_{time.time()}.pt')
+        torch.save(self.AdvNetCriticTarget.value_func.state_dict(), f'adv_target_critic_state_{time.time()}.pt')
         self.plot_res(rewards_good, rewards_adv, epsilon_plotting, loss_plotting_good, loss_plotting_adv)
 
     @staticmethod
@@ -298,20 +297,24 @@ class TagWorld:
         plt.title('Good agents average rewards')
         plt.xlabel('Number of episodes')
         plt.ylabel('Average Reward')
+        plt.savefig(f'fig_{time.time()}_1.png')
         
         plt.figure(2)
         plt.plot(rewards_adv)
         plt.title('Adversial agents average rewards')
         plt.xlabel('Number of episodes')
         plt.ylabel('Average Reward')
-        
+        plt.savefig(f'fig_{time.time()}_2.png')
+
         plt.figure(3)
         plt.plot(epsilon_plotting)
         plt.title('Epsilon Decay')
         plt.xlabel('Number of episodes')
         plt.ylabel('Epsilon value')
-        
+        plt.savefig(f'fig_{time.time()}_3.png')
+
         plt.show()
+
         # fig1, axes1 = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
         # plt.figure(figsize=(16, 9))
         # fig1.subplots_adjust(hspace=.5)
@@ -343,7 +346,7 @@ class TagWorld:
             num_good=1,
             num_adversaries=3,
             num_obstacles=2,
-            max_cycles=1000,
+            max_cycles=3000,
             continuous_actions=True,
             render_mode='human'
         )

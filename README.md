@@ -18,3 +18,10 @@ network list:
 
 
 In the pettingzoo env, there should be 
+
+```shell
+module unload python # depends
+module load python 3.8.11
+module load torch 
+pip install pettingzoo==1.22.1
+```
