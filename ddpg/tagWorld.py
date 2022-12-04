@@ -17,7 +17,7 @@ class TagWorld:
     def __init__(self):
         self.n_good = 1
         self.n_adv = 3
-        self.n_obstacles = 2
+        self.n_obstacles = 0
         self.max_cycs = 1000
         self.continuous = True
 
@@ -37,12 +37,12 @@ class TagWorld:
         self.BATCH_SIZE = 32
         self.BUFFER_SIZE = 5000
         self.epsilon = 0.9
-        self.decay = 0.99
-        self.max_episodes = 1
+        self.decay = 0.99999
+        self.max_episodes = 100
         self.max_rollout = 350
 
-        n_inputs_good = 14
-        n_inputs_adv = 16
+        n_inputs_good = 10
+        n_inputs_adv = 12
         n_outputs = 5
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -106,7 +106,9 @@ class TagWorld:
 
             output_good = 0
             output_adv = 0
-
+            # Decay greedy epsilon
+            self.epsilon = self.epsilon * self.decay
+            
             for agent in self.env.agent_iter():
                 # if count % 50 == 0:
                 #     print(count)
@@ -119,10 +121,10 @@ class TagWorld:
                     # tensor([0.1313, -0.0689, -0.0344, 0.1128, -0.3169], grad_fn= < TanhBackward0 >)
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
-
-                    agent_reward += np.linalg.norm((observation[8], observation[9])) + \
-                        np.linalg.norm((observation[10] + observation[11])) + \
-                        np.linalg.norm((observation[12] + observation[13]))
+                    
+                    # agent_reward += np.linalg.norm((observation[8], observation[9])) + \
+                    #     np.linalg.norm((observation[10] + observation[11])) + \
+                    #     np.linalg.norm((observation[12] + observation[13]))
                 else:
                     reward_adv = reward_adv + agent_reward
                     action = self.AdvNetActor.get_action(torch.from_numpy(observation).to(self.device))
@@ -137,7 +139,7 @@ class TagWorld:
                 if p < self.epsilon:
                     action = self.env.action_space(agent).sample()
                 # Decay greedy epsilon
-                self.epsilon = self.epsilon * self.decay
+                # self.epsilon = self.epsilon * self.decay
 
                 # Get the new state, reward, and done signal
                 self.env.step(action)
@@ -349,32 +351,36 @@ class TagWorld:
 
     def render(self):
         env = simple_tag_v2.env(
-            num_good=1,
-            num_adversaries=3,
-            num_obstacles=2,
-            max_cycles=3000,
-            continuous_actions=True,
+            num_good=self.n_good,
+            num_adversaries=self.n_adv,
+            num_obstacles=self.n_obstacles,
+            max_cycles=self.max_cycs/2,
+            continuous_actions=self.continuous,
             render_mode='human'
         )
-
+        total__reward_good = 0
+        total__reward_adv = 0
         env.reset()
         for agent in env.agent_iter():
             observation, reward, termination, truncation, info = env.last()
+            if termination or truncation:
+                env.reset()
+                break
             if agent != 'agent_0':
-                if termination or truncation:
-                    env.reset()
-                    continue
                 action = self.AdvNetActor.policy(torch.from_numpy(env.last()[0]).to(self.device))
                 action = action.cpu().detach().numpy()
+                total__reward_adv += reward
                 action = np.clip(action, 0, 1)
                 # print(action)
             else:
+                total__reward_good += reward
                 action = None if termination or truncation else env.action_space(agent).sample()
-
             env.step(action)
             env.render()
-            time.sleep(0.01)
+            time.sleep(0.005)
         env.close()
+        print("Total reward Good: ", total__reward_good )
+        print("Total reward Adv: ", total__reward_adv)
         # raise NotImplementedError
 
 
