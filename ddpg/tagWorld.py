@@ -38,8 +38,8 @@ class TagWorld:
         self.BUFFER_SIZE = 5000
         self.epsilon = 0.9
         self.decay = 0.99999
-        self.max_episodes = 100
-        self.max_rollout = 350
+        self.max_episodes = 40
+        self.max_rollout = 400
 
         n_inputs_good = 10
         n_inputs_adv = 12
@@ -122,17 +122,16 @@ class TagWorld:
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
                     
-                    # agent_reward += np.linalg.norm((observation[8], observation[9])) + \
-                    #     np.linalg.norm((observation[10] + observation[11])) + \
-                    #     np.linalg.norm((observation[12] + observation[13]))
+                    agent_reward += 5 * (np.linalg.norm((observation[4], observation[5])) +
+                                         np.linalg.norm((observation[6], observation[7])) +
+                                         np.linalg.norm((observation[8], observation[9])))
                 else:
                     reward_adv = reward_adv + agent_reward
                     action = self.AdvNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)
 
-                    agent_reward -= np.linalg.norm((observation[8], observation[9])) + \
-                        np.linalg.norm((observation[10] + observation[11]))
+                    agent_reward -= 5 * np.linalg.norm((observation[8], observation[9]))
 
                 # epsilon greedy, if true, replace the action above
                 p = random.random()
@@ -143,8 +142,15 @@ class TagWorld:
 
                 # Get the new state, reward, and done signal
                 self.env.step(action)
-                _, reward_new, termination_new, truncation_new, _ = self.env.last()
+                _, _, termination_new, truncation_new, _ = self.env.last()
                 observation_new = self.env.observe(agent)
+                reward_new = self.env.rewards[agent]
+                if agent == 'agent_0':
+                    reward_new += 5 * (np.linalg.norm((observation_new[4], observation_new[5])) +
+                                       np.linalg.norm((observation_new[6], observation_new[7])) +
+                                       np.linalg.norm((observation_new[8], observation_new[9])))
+                else:
+                    agent_reward -= 5 * np.linalg.norm((observation_new[8], observation_new[9]))
 
                 # store replay buffer
                 experience = [observation, action, observation_new, reward_new]
