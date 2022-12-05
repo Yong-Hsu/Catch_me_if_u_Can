@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import time
 
 from pettingzoo.mpe import simple_tag_v2
@@ -18,6 +19,14 @@ import torch
 
 model = ActorNet(16,5,32)
 model.load_state_dict(torch.load(r'C:\Users\albor\Desktop\CMIYC pre trained\AdvNetActor_1669992271.3201299.pt', map_location=torch.device('cpu')), strict=False)
+=======
+import torch
+from pettingzoo.mpe import simple_tag_v2
+
+
+# Model class must be defined somewhere
+model = torch.jit.load(r'"E:\DTU\DeepLearning\Catch_me_if_u_Can\ddpg\AdvNetActor_1670158469.7885914.pt"')
+>>>>>>> b32e97332c23deed4ba170c7c76ba64e3b069f8d
 model.eval()
 
 

@@ -17,7 +17,7 @@ class TagWorld:
     def __init__(self):
         self.n_good = 1
         self.n_adv = 3
-        self.n_obstacles = 2
+        self.n_obstacles = 0
         self.max_cycs = 1000
         self.continuous = True
 
@@ -37,12 +37,12 @@ class TagWorld:
         self.BATCH_SIZE = 32
         self.BUFFER_SIZE = 5000
         self.epsilon = 0.9
-        self.decay = 0.99
-        self.max_episodes = 35
-        self.max_rollout = 350
+        self.decay = 0.99999
+        self.max_episodes = 40
+        self.max_rollout = 400
 
-        n_inputs_good = 14
-        n_inputs_adv = 16
+        n_inputs_good = 10
+        n_inputs_adv = 12
         n_outputs = 5
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -106,37 +106,51 @@ class TagWorld:
 
             output_good = 0
             output_adv = 0
-
+            # Decay greedy epsilon
+            self.epsilon = self.epsilon * self.decay
+            
             for agent in self.env.agent_iter():
                 # if count % 50 == 0:
                 #     print(count)
 
                 # action from network
                 observation, agent_reward, _, _, _ = self.env.last()
-                # todo: add noise
                 if agent == 'agent_0':
                     reward_good = reward_good + agent_reward
                     action = self.GoodNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     # tensor([0.1313, -0.0689, -0.0344, 0.1128, -0.3169], grad_fn= < TanhBackward0 >)
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
+                    
+                    agent_reward += 5 * (np.linalg.norm((observation[4], observation[5])) +
+                                         np.linalg.norm((observation[6], observation[7])) +
+                                         np.linalg.norm((observation[8], observation[9])))
                 else:
                     reward_adv = reward_adv + agent_reward
                     action = self.AdvNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)
 
+                    agent_reward -= 5 * np.linalg.norm((observation[8], observation[9]))
+
                 # epsilon greedy, if true, replace the action above
                 p = random.random()
                 if p < self.epsilon:
                     action = self.env.action_space(agent).sample()
                 # Decay greedy epsilon
-                self.epsilon = self.epsilon * self.decay
+                # self.epsilon = self.epsilon * self.decay
 
                 # Get the new state, reward, and done signal
                 self.env.step(action)
-                _, reward_new, termination_new, truncation_new, _ = self.env.last()
+                _, _, termination_new, truncation_new, _ = self.env.last()
                 observation_new = self.env.observe(agent)
+                reward_new = self.env.rewards[agent]
+                if agent == 'agent_0':
+                    reward_new += 5 * (np.linalg.norm((observation_new[4], observation_new[5])) +
+                                       np.linalg.norm((observation_new[6], observation_new[7])) +
+                                       np.linalg.norm((observation_new[8], observation_new[9])))
+                else:
+                    agent_reward -= 5 * np.linalg.norm((observation_new[8], observation_new[9]))
 
                 # store replay buffer
                 experience = [observation, action, observation_new, reward_new]
@@ -271,8 +285,8 @@ class TagWorld:
                 #     self.GoodNetCritic.value_func.zero_grad()
                 #     self.GoodNetCriticTarget.value_func.zero_grad()
                 #
-                    # torch.save(self.GoodNetActorTarget.policy.state_dict(), 'good_target_actor_state_1.pt')
-                    # torch.save(self.GoodNetCriticTarget.value_func.state_dict(), 'good_target_critic_state_1.pt')
+                # torch.save(self.GoodNetActorTarget.policy.state_dict(), 'good_target_actor_state_1.pt')
+                # torch.save(self.GoodNetCriticTarget.value_func.state_dict(), 'good_target_critic_state_1.pt')
 
                 count = count + 1
 
@@ -298,7 +312,7 @@ class TagWorld:
         plt.xlabel('Number of episodes')
         plt.ylabel('Average Reward')
         plt.savefig(f'fig_{time.time()}_1.png')
-        
+
         plt.figure(2)
         plt.plot(rewards_adv)
         plt.title('Adversial agents average rewards')
@@ -343,32 +357,36 @@ class TagWorld:
 
     def render(self):
         env = simple_tag_v2.env(
-            num_good=1,
-            num_adversaries=3,
-            num_obstacles=2,
-            max_cycles=3000,
-            continuous_actions=True,
+            num_good=self.n_good,
+            num_adversaries=self.n_adv,
+            num_obstacles=self.n_obstacles,
+            max_cycles=self.max_cycs/2,
+            continuous_actions=self.continuous,
             render_mode='human'
         )
-
+        total__reward_good = 0
+        total__reward_adv = 0
         env.reset()
         for agent in env.agent_iter():
             observation, reward, termination, truncation, info = env.last()
+            if termination or truncation:
+                env.reset()
+                break
             if agent != 'agent_0':
-                if termination or truncation:
-                    env.reset()
-                    continue
                 action = self.AdvNetActor.policy(torch.from_numpy(env.last()[0]).to(self.device))
                 action = action.cpu().detach().numpy()
+                total__reward_adv += reward
                 action = np.clip(action, 0, 1)
                 # print(action)
             else:
+                total__reward_good += reward
                 action = None if termination or truncation else env.action_space(agent).sample()
-
             env.step(action)
             env.render()
-            time.sleep(0.01)
+            time.sleep(0.005)
         env.close()
+        print("Total reward Good: ", total__reward_good )
+        print("Total reward Adv: ", total__reward_adv)
         # raise NotImplementedError
 
 

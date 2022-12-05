@@ -38,6 +38,9 @@ class TestStringMethods(unittest.TestCase):
 
         env.close()
 
+    def render_pt(self):
+        raise NotImplementedError
+
 
 if __name__ == '__main__':
     unittest.main()
