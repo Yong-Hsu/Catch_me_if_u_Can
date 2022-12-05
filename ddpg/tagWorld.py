@@ -38,7 +38,7 @@ class TagWorld:
         self.BUFFER_SIZE = 5000
         self.epsilon = 0.9
         self.decay = 0.99999
-        self.max_episodes = 40
+        self.max_episodes = 29
         self.max_rollout = 400
 
         n_inputs_good = 10
