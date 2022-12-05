@@ -38,8 +38,8 @@ class TagWorld:
         self.BUFFER_SIZE = 5000
         self.epsilon = 0.9
         self.decay = 0.99999
-        self.max_episodes = 29
-        self.max_rollout = 400
+        self.max_episodes = 100
+        self.max_rollout = 500
 
         n_inputs_good = 10
         n_inputs_adv = 12
@@ -118,11 +118,10 @@ class TagWorld:
                 if agent == 'agent_0':
                     reward_good = reward_good + agent_reward
                     action = self.GoodNetActor.get_action(torch.from_numpy(observation).to(self.device))
-                    # tensor([0.1313, -0.0689, -0.0344, 0.1128, -0.3169], grad_fn= < TanhBackward0 >)
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
                     
-                    agent_reward += 5 * (np.linalg.norm((observation[4], observation[5])) +
+                    agent_reward += 8.8 * (np.linalg.norm((observation[4], observation[5])) +
                                          np.linalg.norm((observation[6], observation[7])) +
                                          np.linalg.norm((observation[8], observation[9])))
                 else:
@@ -131,7 +130,7 @@ class TagWorld:
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)
 
-                    agent_reward -= 5 * np.linalg.norm((observation[8], observation[9]))
+                    agent_reward -= 8.8 * np.linalg.norm((observation[8], observation[9]))
 
                 # epsilon greedy, if true, replace the action above
                 p = random.random()
@@ -299,8 +298,8 @@ class TagWorld:
             loss_plotting_adv.append(output_adv)
 
         torch.save(self.AdvNetActor.policy.state_dict(), f'AdvNetActor_{time.time()}.pt')
-        torch.save(self.AdvNetActorTarget.policy.state_dict(), f'adv_target_actor_state_{time.time()}.pt')
-        torch.save(self.AdvNetCriticTarget.value_func.state_dict(), f'adv_target_critic_state_{time.time()}.pt')
+        # torch.save(self.AdvNetActorTarget.policy.state_dict(), f'adv_target_actor_state_{time.time()}.pt')
+        # torch.save(self.AdvNetCriticTarget.value_func.state_dict(), f'adv_target_critic_state_{time.time()}.pt')
         self.plot_res(rewards_good, rewards_adv, epsilon_plotting, loss_plotting_good, loss_plotting_adv)
 
     @staticmethod
