@@ -25,8 +25,7 @@ class TestStringMethods(unittest.TestCase):
         env.reset()
         for agent in env.agent_iter():
             observation, _, termination, truncation, _ = env.last()
-            action = None if termination or truncation else env.action_space(
-                agent).sample()  # this is where you would insert your policy
+            action = None if termination or truncation else env.action_space(agent).sample()  # this is where you would insert your policy
 
             if agent == 'agent_0':
                 res = goodActor.get_action(torch.from_numpy(observation))

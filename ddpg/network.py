@@ -7,6 +7,8 @@ class ActorNet(nn.Module):
         super(ActorNet, self).__init__()
         self.action_vector = nn.Sequential(nn.Linear(d_in, batch_size),
                                            nn.ReLU(),
+                                           nn.Linear(batch_size,batch_size),
+                                           nn.ReLU(),
                                            nn.Linear(batch_size, d_out),
                                            nn.Tanh())
 
@@ -18,6 +20,8 @@ class CriticNet(nn.Module):
     def __init__(self, d_in, d_out, batch_size):
         super(CriticNet, self).__init__()
         self.value = nn.Sequential(nn.Linear(d_in + d_out, batch_size),
+                                   nn.ReLU(),
+                                   nn.Linear(batch_size,batch_size),
                                    nn.ReLU(),
                                    nn.Linear(batch_size, 1))
 
