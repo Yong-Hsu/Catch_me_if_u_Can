@@ -121,7 +121,7 @@ class TagWorld:
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
                     
-                    agent_reward += 8.8 * (np.linalg.norm((observation[4], observation[5])) +
+                    agent_reward += 2 * (np.linalg.norm((observation[4], observation[5])) +
                                          np.linalg.norm((observation[6], observation[7])) +
                                          np.linalg.norm((observation[8], observation[9])))
                 else:
@@ -130,7 +130,7 @@ class TagWorld:
                     action = action.cpu().detach().numpy()
                     action = np.clip(action, 0, 1)
 
-                    agent_reward -= 8.8 * np.linalg.norm((observation[8], observation[9]))
+                    agent_reward -= 6 * np.linalg.norm((observation[8], observation[9]))
 
                 # epsilon greedy, if true, replace the action above
                 p = random.random()
@@ -145,11 +145,11 @@ class TagWorld:
                 observation_new = self.env.observe(agent)
                 reward_new = self.env.rewards[agent]
                 if agent == 'agent_0':
-                    reward_new += 5 * (np.linalg.norm((observation_new[4], observation_new[5])) +
+                    reward_new += 3 * (np.linalg.norm((observation_new[4], observation_new[5])) +
                                        np.linalg.norm((observation_new[6], observation_new[7])) +
                                        np.linalg.norm((observation_new[8], observation_new[9])))
                 else:
-                    agent_reward -= 5 * np.linalg.norm((observation_new[8], observation_new[9]))
+                    reward_new -= 9 * np.linalg.norm((observation_new[8], observation_new[9]))
 
                 # store replay buffer
                 experience = [observation, action, observation_new, reward_new]
