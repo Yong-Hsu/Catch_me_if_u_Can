@@ -38,8 +38,8 @@ class TagWorld:
         self.BUFFER_SIZE = 5000
         self.epsilon = 0.7
         self.decay = 0.99999
-        self.max_episodes = 26
-        self.max_rollout = 500
+        self.max_episodes = 22
+        self.max_rollout = 600
 
         n_inputs_good = 10
         n_inputs_adv = 12
@@ -62,6 +62,11 @@ class TagWorld:
 
         self.AdvNetActorTarget = copy.deepcopy(self.AdvNetActor)
         self.AdvNetCriticTarget = copy.deepcopy(self.AdvNetCritic)
+
+        self.AdvNetActor.policy.apply(initialize_weights)
+        self.AdvNetCritic.value_func.apply(initialize_weights)
+        self.AdvNetActorTarget.policy.apply(initialize_weights)
+        self.AdvNetCriticTarget.value_func.apply(initialize_weights)
 
         # to GPU
         self.GoodNetActor.policy.to(self.device)
@@ -192,7 +197,7 @@ class TagWorld:
                     loss = nn.MSELoss()
                     # output_good = loss(actual_v_good, target_v_good)
                     output_adv = loss(actual_v_adv, target_v_adv)
-                    loss_plotting_adv.append(loss)
+                    loss_plotting_adv.append(loss.cpu())
 
                     # self.optim_good.zero_grad()
                     self.optim_adv.zero_grad()

@@ -3,7 +3,7 @@ import torch
 from pettingzoo.mpe import simple_tag_v2
 
 model = ActorNet(12, 5, 32)
-model.load_state_dict(torch.load(r'AdvNetActor_1670332178.1580124.pt',
+model.load_state_dict(torch.load(r'AdvNetActor_1670334392.074643.pt',
                       map_location=torch.device('cuda')),
                       strict=False)
 

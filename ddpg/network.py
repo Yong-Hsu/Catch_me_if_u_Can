@@ -7,9 +7,9 @@ class ActorNet(nn.Module):
         super(ActorNet, self).__init__()
         self.action_vector = nn.Sequential(nn.Linear(d_in, batch_size),
                                            nn.ReLU(),
-                                           nn.Linear(batch_size, batch_size//2),
+                                           nn.Linear(batch_size, batch_size // 2),
                                            nn.ReLU(),
-                                           nn.Linear(batch_size//2, d_out),
+                                           nn.Linear(batch_size // 2, d_out),
                                            nn.Tanh())
 
     def forward(self, x):
@@ -21,9 +21,9 @@ class CriticNet(nn.Module):
         super(CriticNet, self).__init__()
         self.value = nn.Sequential(nn.Linear(d_in + d_out, batch_size),
                                    nn.ReLU(),
-                                   nn.Linear(batch_size, batch_size//2),
+                                   nn.Linear(batch_size, batch_size // 2),
                                    nn.ReLU(),
-                                   nn.Linear(batch_size//2, 1))
+                                   nn.Linear(batch_size // 2, 1))
 
     def forward(self, x):
         return self.value(x)
@@ -44,3 +44,9 @@ class Critic:
     def get_state_value(self, state, action):
         x = torch.cat((state, action), dim=1)
         return self.value_func.forward(x)
+
+
+def initialize_weights(m):
+    if isinstance(m, nn.Linear):
+        nn.init.kaiming_uniform_(m.weight.data)
+        nn.init.constant_(m.bias.data, 0)
