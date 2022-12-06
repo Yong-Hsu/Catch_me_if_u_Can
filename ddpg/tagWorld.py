@@ -192,6 +192,7 @@ class TagWorld:
                     loss = nn.MSELoss()
                     # output_good = loss(actual_v_good, target_v_good)
                     output_adv = loss(actual_v_adv, target_v_adv)
+                    loss_plotting_adv.append(loss)
 
                     # self.optim_good.zero_grad()
                     self.optim_adv.zero_grad()
@@ -329,6 +330,13 @@ class TagWorld:
         plt.xlabel('Number of episodes')
         plt.ylabel('Epsilon value')
         plt.savefig(f'fig_{time.time()}_3.png')
+
+        plt.figure(4)
+        plt.plot(loss_plotting_adv)
+        plt.title('loss plotting adv')
+        plt.xlabel('Number of episodes')
+        plt.ylabel('loss_plotting_adv')
+        plt.savefig(f'fig_{time.time()}_4.png')
 
         plt.show()
 

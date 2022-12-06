@@ -3,7 +3,7 @@ import torch
 from pettingzoo.mpe import simple_tag_v2
 
 model = ActorNet(12, 5, 32)
-model.load_state_dict(torch.load(r'AdvNetActor_1670255835.7902088.pt',
+model.load_state_dict(torch.load(r'AdvNetActor_1670332178.1580124.pt',
                       map_location=torch.device('cuda')),
                       strict=False)
 
@@ -29,6 +29,9 @@ def render():
             action = model(torch.from_numpy(env.last()[0]))
             action = action.cpu().detach().numpy()
             action = np.clip(action, 0, 1)
+            print(action)
+            print(env.observe(agent)[0], env.observe(agent)[1])
+            print('-------------------------------------')
         else:
             action = None if termination or truncation else env.action_space(agent).sample()
 
