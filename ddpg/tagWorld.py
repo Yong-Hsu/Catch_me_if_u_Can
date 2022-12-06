@@ -38,7 +38,7 @@ class TagWorld:
         self.BUFFER_SIZE = 5000
         self.epsilon = 0.7
         self.decay = 0.99999
-        self.max_episodes = 22
+        self.max_episodes = 15
         self.max_rollout = 600
 
         n_inputs_good = 10
@@ -123,7 +123,8 @@ class TagWorld:
                 if agent == 'agent_0':
                     action = self.GoodNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     action = action.cpu().detach().numpy()
-                    action = np.clip(action, 0, 1)  # clip negative and bigger than 1 values
+                    action = (np.clip(action, -1, 1) + 1) / 2
+                    # print(action)
 
                     agent_reward += 2 * (np.linalg.norm((observation[4], observation[5])) +
                                          np.linalg.norm((observation[6], observation[7])) +
@@ -133,7 +134,8 @@ class TagWorld:
                 else:
                     action = self.AdvNetActor.get_action(torch.from_numpy(observation).to(self.device))
                     action = action.cpu().detach().numpy()
-                    action = np.clip(action, 0, 1)
+                    action = (np.clip(action, -1, 1) + 1) / 2
+                    # print(action)
 
                     agent_reward -= 6 * np.linalg.norm((observation[8], observation[9]))
                     agent_reward -= min(abs(1 // (5 * np.linalg.norm((observation[0], observation[1])))), 50)
@@ -197,7 +199,7 @@ class TagWorld:
                     loss = nn.MSELoss()
                     # output_good = loss(actual_v_good, target_v_good)
                     output_adv = loss(actual_v_adv, target_v_adv)
-                    loss_plotting_adv.append(loss.cpu())
+                    loss_plotting_adv.append(loss.cpu().detach().numpy())
 
                     # self.optim_good.zero_grad()
                     self.optim_adv.zero_grad()
@@ -392,7 +394,7 @@ class TagWorld:
                 action = self.AdvNetActor.policy(torch.from_numpy(env.last()[0]).to(self.device))
                 action = action.cpu().detach().numpy()
                 total__reward_adv += reward
-                action = np.clip(action, 0, 1)
+                action = (np.clip(action, -1, 1) + 1) / 2
                 # print(action)
             else:
                 total__reward_good += reward
