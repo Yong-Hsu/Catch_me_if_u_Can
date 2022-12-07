@@ -36,11 +36,11 @@ class TagWorld:
         self.ALPHA = 1e-3  # learning rate
         self.TAU = 0.001
         self.BATCH_SIZE = 32
-        self.BUFFER_SIZE = 5000
+        self.BUFFER_SIZE = 3500
         self.epsilon = 0.7
         self.decay = 0.99999
-        self.max_episodes = 200
-        self.max_rollout = 200
+        self.max_episodes = 20
+        self.max_rollout = 500
 
         n_inputs_good = 10
         n_inputs_adv = 12
@@ -155,15 +155,17 @@ class TagWorld:
                 _, _, termination_new, truncation_new, _ = self.env.last()
                 observation_new = self.env.observe(agent)
                 reward_new = self.env.rewards[agent]
-                # if agent == 'agent_0':
+
+                if agent == 'agent_0':
+                    pass
                 #     reward_new += (np.linalg.norm((observation_new[4], observation_new[5])) +
                 #                    np.linalg.norm((observation_new[6], observation_new[7])) +
                 #                    np.linalg.norm((observation_new[8], observation_new[9])))
                 #     reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
-                # else:
-                #     reward_new -= 3 * np.linalg.norm((observation_new[8], observation_new[9]))
+                else:
+                    reward_new -= 0.5 * np.linalg.norm((observation_new[8], observation_new[9]))
                 #     reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
-
+                # print(agent, reward_new)
                 # store replay buffer
                 experience = [observation, action, observation_new, reward_new]
                 if agent == 'agent_0':
@@ -201,7 +203,7 @@ class TagWorld:
                     loss = nn.MSELoss()
                     # output_good = loss(actual_v_good, target_v_good)
                     output_adv = loss(actual_v_adv, target_v_adv)
-                    loss_plotting_adv.append(loss)
+                    loss_plotting_adv.append(output_adv.cpu().detach().numpy())
 
                     # self.optim_good.zero_grad()
                     self.optim_adv.zero_grad()
