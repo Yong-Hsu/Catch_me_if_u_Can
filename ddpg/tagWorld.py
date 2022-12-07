@@ -12,6 +12,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 from network import *
 
+class OUNoise:
+    """Ornstein-Uhlenbeck process."""
+
+    def __init__(self, size, mu=0., theta=0.15, sigma=0.2):
+        """Initialize parameters and noise process."""
+        self.mu = mu * np.ones(size)
+        self.theta = theta
+        self.sigma = sigma
+        self.reset()
+
+    def reset(self):
+        """Reset the internal state (= noise) to mean (mu)."""
+        self.state = copy.copy(self.mu)
+
+    def sample(self):
+        """Update internal state and return it as a noise sample."""
+        x = self.state
+        dx = self.theta * (self.mu - x) + self.sigma * np.array([np.random.randn() for i in range(len(x))])
+        self.state = x + dx
+        return self.state
 
 class TagWorld:
     def __init__(self):
@@ -20,6 +40,7 @@ class TagWorld:
         self.n_obstacles = 0
         self.max_cycs = 1000
         self.continuous = True
+        
 
         self.env = simple_tag_v2.env(
             # todo: works with one good agent now
@@ -38,12 +59,13 @@ class TagWorld:
         self.BUFFER_SIZE = 5000
         self.epsilon = 0.7
         self.decay = 0.99999
-        self.max_episodes = 15
-        self.max_rollout = 600
+        self.max_episodes = 200
+        self.max_rollout = 200
 
         n_inputs_good = 10
         n_inputs_adv = 12
         n_outputs = 5
+        self.Noise = OUNoise(n_outputs)
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print("Running on device:", self.device)
@@ -122,24 +144,24 @@ class TagWorld:
                 observation, agent_reward, _, _, _ = self.env.last()
                 if agent == 'agent_0':
                     action = self.GoodNetActor.get_action(torch.from_numpy(observation).to(self.device))
-                    action = action.cpu().detach().numpy()
-                    action = (np.clip(action, -1, 1) + 1) / 2
+                    action = action.cpu().detach().numpy() + self.Noise.sample()
+                    action = np.float32(np.clip(action, 0, 1))
                     # print(action)
 
-                    agent_reward += 2 * (np.linalg.norm((observation[4], observation[5])) +
-                                         np.linalg.norm((observation[6], observation[7])) +
-                                         np.linalg.norm((observation[8], observation[9])))
-                    agent_reward -= min(abs(1 // (5 * np.linalg.norm((observation[0], observation[1])))), 50)
-                    reward_good = reward_good + agent_reward
+                    # agent_reward += 2 * (np.linalg.norm((observation[4], observation[5])) +
+                    #                      np.linalg.norm((observation[6], observation[7])) +
+                    #                      np.linalg.norm((observation[8], observation[9])))
+                    # agent_reward -= min(abs(1 // (5 * np.linalg.norm((observation[0], observation[1])))), 50)
+                    # reward_good = reward_good + agent_reward
                 else:
                     action = self.AdvNetActor.get_action(torch.from_numpy(observation).to(self.device))
-                    action = action.cpu().detach().numpy()
-                    action = (np.clip(action, -1, 1) + 1) / 2
+                    action = action.cpu().detach().numpy() + self.Noise.sample()
+                    action = np.float32(np.clip(action, 0, 1))
                     # print(action)
 
-                    agent_reward -= 6 * np.linalg.norm((observation[8], observation[9]))
-                    agent_reward -= min(abs(1 // (5 * np.linalg.norm((observation[0], observation[1])))), 50)
-                    reward_adv = reward_adv + agent_reward
+                    # agent_reward -= 6 * np.linalg.norm((observation[8], observation[9]))
+                    # agent_reward -= min(abs(1 // (5 * np.linalg.norm((observation[0], observation[1])))), 50)
+                    # reward_adv = reward_adv + agent_reward
 
                 # epsilon greedy, if true, replace the action above
                 p = random.random()
@@ -153,14 +175,14 @@ class TagWorld:
                 _, _, termination_new, truncation_new, _ = self.env.last()
                 observation_new = self.env.observe(agent)
                 reward_new = self.env.rewards[agent]
-                if agent == 'agent_0':
-                    reward_new += (np.linalg.norm((observation_new[4], observation_new[5])) +
-                                   np.linalg.norm((observation_new[6], observation_new[7])) +
-                                   np.linalg.norm((observation_new[8], observation_new[9])))
-                    reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
-                else:
-                    reward_new -= 3 * np.linalg.norm((observation_new[8], observation_new[9]))
-                    reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
+                # if agent == 'agent_0':
+                #     reward_new += (np.linalg.norm((observation_new[4], observation_new[5])) +
+                #                    np.linalg.norm((observation_new[6], observation_new[7])) +
+                #                    np.linalg.norm((observation_new[8], observation_new[9])))
+                #     reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
+                # else:
+                #     reward_new -= 3 * np.linalg.norm((observation_new[8], observation_new[9]))
+                #     reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
 
                 # store replay buffer
                 experience = [observation, action, observation_new, reward_new]
@@ -199,7 +221,7 @@ class TagWorld:
                     loss = nn.MSELoss()
                     # output_good = loss(actual_v_good, target_v_good)
                     output_adv = loss(actual_v_adv, target_v_adv)
-                    loss_plotting_adv.append(loss.cpu().detach().numpy())
+                    loss_plotting_adv.append(loss)
 
                     # self.optim_good.zero_grad()
                     self.optim_adv.zero_grad()
@@ -394,7 +416,7 @@ class TagWorld:
                 action = self.AdvNetActor.policy(torch.from_numpy(env.last()[0]).to(self.device))
                 action = action.cpu().detach().numpy()
                 total__reward_adv += reward
-                action = (np.clip(action, -1, 1) + 1) / 2
+                #action = (np.clip(action, 0, 1) + 1) / 2
                 # print(action)
             else:
                 total__reward_good += reward

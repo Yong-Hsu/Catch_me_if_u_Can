@@ -10,7 +10,7 @@ class ActorNet(nn.Module):
                                            nn.Linear(batch_size, batch_size // 2),
                                            nn.ReLU(),
                                            nn.Linear(batch_size // 2, d_out),
-                                           nn.Tanh())
+                                           nn.Sigmoid())
 
     def forward(self, x):
         return self.action_vector(x)

@@ -21,7 +21,7 @@ In the pettingzoo env, there should be
 
 ```shell
 module unload python # depends
-module load python3/3.8.11 #alternatively use 'swap' instead of load'
+module swap python3/3.8.11 #alternatively use 'swap' instead of load'
 module load torch 
 pip install pettingzoo==1.22.1
 ```
