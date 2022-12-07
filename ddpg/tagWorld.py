@@ -166,7 +166,7 @@ class TagWorld:
                     reward_new -= 1 * np.linalg.norm((observation[8], observation[9]))
 
                 # store replay buffer
-                experience = [observation, action, observation_new, -reward_new]
+                experience = [observation, action, observation_new, reward_new]
                 if agent == 'agent_0':
                     # different iteration or do the calculation
                     self.ReplayBufferGood.append_memory(experience)
