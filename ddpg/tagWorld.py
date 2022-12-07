@@ -1,10 +1,11 @@
+import datetime
 import time
 
 from pettingzoo.mpe import simple_tag_v2
 
 import copy
 import random
-from utils import ReplayBuffer, extract_data
+from utils import ReplayBuffer, extract_data, OUNoise
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
@@ -12,26 +13,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from network import *
 
-class OUNoise:
-    """Ornstein-Uhlenbeck process."""
-
-    def __init__(self, size, mu=0., theta=0.15, sigma=0.2):
-        """Initialize parameters and noise process."""
-        self.mu = mu * np.ones(size)
-        self.theta = theta
-        self.sigma = sigma
-        self.reset()
-
-    def reset(self):
-        """Reset the internal state (= noise) to mean (mu)."""
-        self.state = copy.copy(self.mu)
-
-    def sample(self):
-        """Update internal state and return it as a noise sample."""
-        x = self.state
-        dx = self.theta * (self.mu - x) + self.sigma * np.array([np.random.randn() for i in range(len(x))])
-        self.state = x + dx
-        return self.state
 
 class TagWorld:
     def __init__(self):
@@ -40,7 +21,6 @@ class TagWorld:
         self.n_obstacles = 0
         self.max_cycs = 1000
         self.continuous = True
-        
 
         self.env = simple_tag_v2.env(
             # todo: works with one good agent now
@@ -331,7 +311,8 @@ class TagWorld:
             loss_plotting_good.append(output_good)
             loss_plotting_adv.append(output_adv)
 
-        torch.save(self.AdvNetActor.policy.state_dict(), f'AdvNetActor_{time.time()}.pt')
+        torch.save(self.AdvNetActor.policy.state_dict(),
+                   f'AdvNetActor_{datetime.datetime.now().hour}_{datetime.datetime.now().minute}.pt')
         # torch.save(self.AdvNetActorTarget.policy.state_dict(), f'adv_target_actor_state_{time.time()}.pt')
         # torch.save(self.AdvNetCriticTarget.value_func.state_dict(), f'adv_target_critic_state_{time.time()}.pt')
         self.plot_res(rewards_good, rewards_adv, epsilon_plotting, loss_plotting_good, loss_plotting_adv)
@@ -416,7 +397,7 @@ class TagWorld:
                 action = self.AdvNetActor.policy(torch.from_numpy(env.last()[0]).to(self.device))
                 action = action.cpu().detach().numpy()
                 total__reward_adv += reward
-                #action = (np.clip(action, 0, 1) + 1) / 2
+                # action = (np.clip(action, 0, 1) + 1) / 2
                 # print(action)
             else:
                 total__reward_good += reward
