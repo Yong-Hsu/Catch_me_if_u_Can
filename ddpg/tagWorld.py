@@ -36,11 +36,11 @@ class TagWorld:
         self.ALPHA = 1e-3  # learning rate
         self.TAU = 0.001
         self.BATCH_SIZE = 32
-        self.BUFFER_SIZE = 3500
+        self.BUFFER_SIZE = 2500
         self.epsilon = 0.7
         self.decay = 0.99999
-        self.max_episodes = 25
-        self.max_rollout = 450
+        self.max_episodes = 8
+        self.max_rollout = 500
 
         n_inputs_good = 10
         n_inputs_adv = 12
@@ -202,7 +202,6 @@ class TagWorld:
                     loss = nn.MSELoss()
                     # output_good = loss(actual_v_good, target_v_good)
                     output_adv = loss(actual_v_adv, target_v_adv)
-                    loss_plotting_adv.append(output_adv.cpu().detach().numpy())
 
                     # self.optim_good.zero_grad()
                     self.optim_adv.zero_grad()
@@ -310,7 +309,8 @@ class TagWorld:
             epsilon_plotting.append(self.epsilon)  # appends the epsilon value after each episode
 
             loss_plotting_good.append(output_good)
-            loss_plotting_adv.append(output_adv)
+            if output_adv != 0:
+                loss_plotting_adv.append(output_adv.item())
 
         torch.save(self.AdvNetActor.policy.state_dict(),
                    f'AdvNetActor_{datetime.datetime.now().hour}_{datetime.datetime.now().minute}.pt')
