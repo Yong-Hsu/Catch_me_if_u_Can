@@ -39,8 +39,8 @@ class TagWorld:
         self.BUFFER_SIZE = 3500
         self.epsilon = 0.7
         self.decay = 0.99999
-        self.max_episodes = 20
-        self.max_rollout = 500
+        self.max_episodes = 25
+        self.max_rollout = 450
 
         n_inputs_good = 10
         n_inputs_adv = 12
@@ -163,9 +163,10 @@ class TagWorld:
                 #                    np.linalg.norm((observation_new[8], observation_new[9])))
                 #     reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
                 else:
-                    reward_new -= 0.5 * np.linalg.norm((observation_new[8], observation_new[9]))
-                #     reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
-                # print(agent, reward_new)
+                    self_pos = (observation_new[2], observation_new[3])
+                    agent_pos = self.env.observe('agent_0')[2:4]
+                    reward_new -= 0.5 * np.linalg.norm((self_pos[0] - agent_pos[0], self_pos[1] - agent_pos[1]))
+
                 # store replay buffer
                 experience = [observation, action, observation_new, reward_new]
                 if agent == 'agent_0':
