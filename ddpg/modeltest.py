@@ -33,9 +33,7 @@ def render():
             # print(env.observe(agent)[0], env.observe(agent)[1])
             # print('-------------------------------------')
             # print(agent)
-            self_pos = (observation[2], observation[3])
-            agent_pos = env.observe('agent_0')[2:4]
-            print(np.linalg.norm((self_pos[0] - agent_pos[0], self_pos[1] - agent_pos[1])))
+            print(np.linalg.norm((observation[8], observation[9])))
         else:
             action = None if termination or truncation else env.action_space(agent).sample()
 

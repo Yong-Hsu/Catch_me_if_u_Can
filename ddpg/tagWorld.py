@@ -163,12 +163,10 @@ class TagWorld:
                 #                    np.linalg.norm((observation_new[8], observation_new[9])))
                 #     reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
                 else:
-                    self_pos = (observation_new[2], observation_new[3])
-                    agent_pos = self.env.observe('agent_0')[2:4]
-                    reward_new -= 0.5 * np.linalg.norm((self_pos[0] - agent_pos[0], self_pos[1] - agent_pos[1]))
+                    reward_new -= 1 * np.linalg.norm((observation[8], observation[9]))
 
                 # store replay buffer
-                experience = [observation, action, observation_new, reward_new]
+                experience = [observation, action, observation_new, -reward_new]
                 if agent == 'agent_0':
                     # different iteration or do the calculation
                     self.ReplayBufferGood.append_memory(experience)
