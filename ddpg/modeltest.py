@@ -3,7 +3,7 @@ import torch
 from pettingzoo.mpe import simple_tag_v2
 
 model = ActorNet(12, 5, 32)
-model.load_state_dict(torch.load(r'AdvNetActor_16_30.pt',
+model.load_state_dict(torch.load(r'AdvNetActor_23_2.pt',
                       map_location=torch.device('cuda')),
                       strict=False)
 
@@ -37,9 +37,10 @@ def render():
         else:
             action = None if termination or truncation else env.action_space(agent).sample()
 
-        env.step(action)
-        env.render()
         time.sleep(0.01)
+        env.step(action)
+
+    env.render()
     env.close()
 
 

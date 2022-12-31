@@ -36,10 +36,10 @@ class TagWorld:
         self.ALPHA = 1e-3  # learning rate
         self.TAU = 0.001
         self.BATCH_SIZE = 32
-        self.BUFFER_SIZE = 2500
+        self.BUFFER_SIZE = 3000
         self.epsilon = 0.7
         self.decay = 0.99999
-        self.max_episodes = 8
+        self.max_episodes = 9
         self.max_rollout = 500
 
         n_inputs_good = 10
@@ -139,16 +139,16 @@ class TagWorld:
                     action = np.float32(np.clip(action, 0, 1))
                     # print(action)
 
-                    # agent_reward -= 6 * np.linalg.norm((observation[8], observation[9]))
+                    agent_reward -= 0.5 * np.linalg.norm((observation[8], observation[9]))
                     # agent_reward -= min(abs(1 // (5 * np.linalg.norm((observation[0], observation[1])))), 50)
-                    # reward_adv = reward_adv + agent_reward
+                    reward_adv = reward_adv + agent_reward
 
                 # epsilon greedy, if true, replace the action above
                 p = random.random()
                 if p < self.epsilon:
                     action = self.env.action_space(agent).sample()
                 # Decay greedy epsilon
-                # self.epsilon = self.epsilon * self.decay
+                self.epsilon = self.epsilon * self.decay
 
                 # Get the new state, reward, and done signal
                 self.env.step(action)
@@ -163,7 +163,7 @@ class TagWorld:
                 #                    np.linalg.norm((observation_new[8], observation_new[9])))
                 #     reward_new -= min(abs(1 // (5 * np.linalg.norm((observation_new[0], observation_new[1])))), 50)
                 else:
-                    reward_new -= 1 * np.linalg.norm((observation[8], observation[9]))
+                    reward_new -= 0.5 * np.linalg.norm((observation[8], observation[9]))
 
                 # store replay buffer
                 experience = [observation, action, observation_new, reward_new]
@@ -250,7 +250,6 @@ class TagWorld:
                 #     compressed_rewards_good = extract_data(sampled_experience_good, self.device)
                 #
                 #     target_action_good = self.GoodNetActorTarget.get_action(compressed_next_states_good)
-                #     # todo: should we average the action tensor? Maybe we should use all those info, same below
                 #     target_action_good = target_action_good.mean(dim=1).unsqueeze(-1)  # (32, 5) -> (32, 1)
                 #     target_value_good = self.GoodNetCriticTarget.get_state_value(compressed_next_states_good,
                 #                                                                  target_action_good)
@@ -321,33 +320,33 @@ class TagWorld:
     @staticmethod
     def plot_res(rewards_good, rewards_adv, epsilon_plotting, loss_plotting_good, loss_plotting_adv):
         # Plotting the avg rewards
-        plt.figure(1)
-        plt.plot(rewards_good)
-        plt.title('Good agents average rewards')
-        plt.xlabel('Number of episodes')
-        plt.ylabel('Average Reward')
-        plt.savefig(f'fig_{time.time()}_1.png')
+        # plt.figure(1)
+        # plt.plot(rewards_good)
+        # plt.title('Good agents average rewards')
+        # plt.xlabel('Number of episodes')
+        # plt.ylabel('Average Reward')
+        # plt.savefig(f'fig_{time.time()}_1.png')
 
         plt.figure(2)
         plt.plot(rewards_adv)
         plt.title('Adversial agents average rewards')
         plt.xlabel('Number of episodes')
         plt.ylabel('Average Reward')
-        plt.savefig(f'fig_{time.time()}_2.png')
+        plt.savefig(f'fig_{datetime.datetime.now().hour}_{datetime.datetime.now().minute}_1.png')
 
         plt.figure(3)
         plt.plot(epsilon_plotting)
         plt.title('Epsilon Decay')
         plt.xlabel('Number of episodes')
         plt.ylabel('Epsilon value')
-        plt.savefig(f'fig_{time.time()}_3.png')
+        plt.savefig(f'fig_{datetime.datetime.now().hour}_{datetime.datetime.now().minute}_3.png')
 
         plt.figure(4)
         plt.plot(loss_plotting_adv)
         plt.title('loss plotting adv')
         plt.xlabel('Number of episodes')
         plt.ylabel('loss_plotting_adv')
-        plt.savefig(f'fig_{time.time()}_4.png')
+        plt.savefig(f'fig_{datetime.datetime.now().hour}_{datetime.datetime.now().minute}_4.png')
 
         plt.show()
 
