@@ -23,7 +23,6 @@ class TagWorld:
         self.continuous = True
 
         self.env = simple_tag_v2.env(
-            # todo: works with one good agent now
             num_good=self.n_good,
             num_adversaries=self.n_adv,
             num_obstacles=self.n_obstacles,
@@ -84,7 +83,7 @@ class TagWorld:
         self.ReplayBufferGood = ReplayBuffer(self.BUFFER_SIZE)
         self.ReplayBufferAdv = ReplayBuffer(self.BUFFER_SIZE)
 
-        # optimizer todo:
+        # optimizer
         self.optim_good = torch.optim.Adam(self.GoodNetCritic.value_func.parameters(), lr=self.ALPHA)
         self.optim_adv = torch.optim.Adam(self.AdvNetCritic.value_func.parameters(), lr=self.ALPHA)
 
@@ -414,4 +413,4 @@ class TagWorld:
 if __name__ == "__main__":
     test = TagWorld()
     test.train()
-    test.render()
+    # test.render()

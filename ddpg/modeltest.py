@@ -13,31 +13,30 @@ def render():
         num_good=1,
         num_adversaries=3,
         num_obstacles=0,
-        max_cycles=3000,
+        max_cycles=150,
         continuous_actions=True,
         render_mode='human'
     )
 
     env.reset()
+    dist = []
     for agent in env.agent_iter():
         observation, reward, termination, truncation, info = env.last()
         if agent != 'agent_0':
             if termination or truncation:
-                print(1)
                 env.reset()
+                print(sum(dist) / len(dist))
+                dist = []
                 continue
-            action = model(torch.from_numpy(env.last()[0]))
-            action = action.cpu().detach().numpy()
-            # action = np.clip(action, 0, 1)
-            # print(action)
-            # print(env.observe(agent)[0], env.observe(agent)[1])
-            # print('-------------------------------------')
-            # print(agent)
-            print(np.linalg.norm((observation[8], observation[9])))
+            # action = model(torch.from_numpy(env.last()[0]))
+            # action = action.cpu().detach().numpy()
+
+            action = None if termination or truncation else env.action_space(agent).sample()
+            dist.append(np.linalg.norm((observation[8], observation[9])))
         else:
             action = None if termination or truncation else env.action_space(agent).sample()
 
-        time.sleep(0.01)
+        # time.sleep(0.01)
         env.step(action)
 
     env.render()
